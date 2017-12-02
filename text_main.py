@@ -6,13 +6,15 @@ import random
 import os
 import sys
 import time
-import jieba
 import shutil
 from time import sleep,ctime
 
 from NavieBayes import *
 from SplitText import *
 from SupportVectorMachines import *
+from WordVector import *
+from gensim.models import Word2Vec
+
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -119,7 +121,7 @@ def GetResult(trueLable, pridictLable):
 
 def PridictWithBayes(root_path, sampleData, st):
     logger = logging.getLogger(__name__)
-    startTime = time.time()
+    startTime1 = time.time()
     if len(sampleData) == 0:
         logger.info('sampleData is null !!')
         return
@@ -139,7 +141,59 @@ def PridictWithBayes(root_path, sampleData, st):
     SaveSampleData('trueLable.txt', trueLable)
     endTime = time.time()
     GetResult(trueLable, pridictLable)
-    logger.info('cost time {0}s'.format(endTime - startTime))
+    logger.info('cost time {0}s'.format(endTime - startTime1))
+
+def PridictWithWV(root_path):
+    logger = logging.getLogger(__name__)
+    st = SplitText(root_path)
+    wv = MyWord2Vector(root_path)
+    #wv.CreateWordVecModel()
+
+    startTime1 = time.time()
+    testFilePath = os.path.join(root_path, 'tarin_corpus_seg', 'verify')
+    wvModelPath = os.path.join(root_path, 'tarin_corpus_seg', 'word2vec')
+    wvModelDic = {}
+    #加载模型
+    startTime = time.time()
+    logger.info('start load model...')
+    for modelName in os.listdir(wvModelPath):
+        if modelName.find('.model') > 0:
+            wvModelFile = os.path.join(wvModelPath, modelName)
+            wvModel = Word2Vec.load(wvModelFile)
+            className = os.path.splitext(modelName)[0]
+            wvModelDic[className] = wvModel
+    endTime = time.time()
+    logger.info('load model cost {0}s'.format(endTime - startTime))
+
+    for className in os.listdir(testFilePath):
+        startTime = time.time()
+        logger.info('start pridict class {0}......'.format(className))
+        testFileSet = os.listdir(os.path.join(testFilePath, className))
+        testFileLable = [os.path.join(testFilePath, className, fileName) for fileName in testFileSet]
+        trueLable.append([int(className)] * len(testFileSet))
+        DoCaculteTestClassWithWV(wvModelDic, testFileLable)
+        endTime = time.time()
+        logger.info('pridict class {0} end, cost {1}s'.format(className, endTime - startTime))
+    SaveSampleData('pridictLable.txt', pridictLable)
+    SaveSampleData('trueLable.txt', trueLable)
+    endTime = time.time()
+    GetResult(trueLable, pridictLable)
+    logger.info('cost time {0}s'.format(endTime - startTime1))
+
+def DoCaculteTestClassWithWV(wvModelDic, testFileLable):
+    lableList = []
+    myWordVec = MyWord2Vector('')
+    for testFile in testFileLable:
+        lable = -1
+        score = 0
+        testFileMatrix = myWordVec.CreateFileWordVecModel(testFile)
+        for wvModelName in wvModelDic.keys():
+            res = myWordVec.PridictWithCov(testFileMatrix, wvModelDic[wvModelName])
+            if score < res:
+                score = res
+                lable = int(wvModelName)
+        lableList.append(lable)
+    pridictLable.append(lableList)
 
 def PridictWithSVM(root_path, sampleData, st):
     logger = logging.getLogger(__name__)
@@ -149,13 +203,14 @@ def PridictWithSVM(root_path, sampleData, st):
         logger.info('sampleData is null !!')
         return
     testFilePath = os.path.join(root_path, 'tarin_corpus_seg', 'verify')
-    lable = []
+
     for className in os.listdir(testFilePath):
         startTime = time.time()
         logger.info('start pridict class {0}......'.format(className))
         testFileSet = os.listdir(os.path.join(testFilePath, className))
         testFileLable = [os.path.join(testFilePath, className, fileName) for fileName in testFileSet]
         trueLable.append([int(className)] * len(testFileSet))
+        lable = []
         for testFile in testFileLable:
             testContent = st.ReadFile(testFile)
             testContent = testContent.replace("\r\n", "").strip()
@@ -186,19 +241,18 @@ def main():
     else:
         st.wordsetvec = st.GetWordVec(wordset_fileName)
     #生成计算所需的样本数据集
-    logger.info( 'strat CreateSampleData......')
     sampleData = st.CreateSampleData()
-    logger.info( 'CreateSampleData end')
+
     #开始测试
     #PridictWithBayes(root_path, sampleData, st)
-    PridictWithSVM(root_path, sampleData, st)
+    #PridictWithSVM(root_path, sampleData, st)
     pass
 
-def test():
+def WordVectest():
     SetupLogging()
-    pL = ReadSampleDataFromFile('pridictLable.txt')
-    tL = ReadSampleDataFromFile('trueLable.txt')
-    GetResult(tL,pL)
+    root_path = os.path.abspath(os.curdir)
+    PridictWithWV(root_path)
 
 if __name__ == '__main__':
+    #WordVectest()
     main()

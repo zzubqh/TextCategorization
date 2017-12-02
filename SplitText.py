@@ -16,10 +16,10 @@ import re
 import jieba
 from myThread import *
 import numpy as np
+import time
+
 
 import sys
-#import importlib
-#importlib.reload(sys)
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -37,7 +37,7 @@ class SplitText:
         self.wordset = set()  #用于暂存词集，避免重复
         self.__oripath__ = os.path.join(rootPath , 'Data', 'train')  #未分词语料库路径
         self.__segpath__ = os.path.join(rootPath , 'tarin_corpus_seg' , 'train') #分词后语料库路径
-
+        self.__wvpath__ = os.path.join(rootPath,'tarin_corpus_seg','word2vec')#词向量模型的输出路径
 
     def ReadFile(self,fileName):
         fp = open(fileName,"rb")

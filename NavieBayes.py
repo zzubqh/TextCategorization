@@ -16,6 +16,8 @@ import logging
 import time
 import sys
 
+from TensorFlow import *
+
 #import importlib
 #importlib.reload(sys)
 reload(sys)
@@ -28,7 +30,7 @@ class Bayes:
         self.__labelvec__ = [ ele[-1] for ele in sampleData]
         self.__classprob__ = self.CacaulteClassProb()
         #生成预测所需的权值矩阵和类标签向量
-        self.dataMatrix, self.labelVec = self.CreateWeightMatrix(True)
+        self.dataMatrix, self.labelVec, self.idf = self.CreateWeightMatrix(True)
 
     def CacaulteClassProb(self):
         logger = logging.getLogger(__name__)
@@ -41,13 +43,6 @@ class Bayes:
         endTime = time.time()
         logger.info('Cacaulte Class Prob cost {0}s'.format(endTime - startTime))
         return classProb
-
-    # def GeneratorDataArray(self,sampleData_ele):
-    #     data_vec = [0] * (self.__data_dic_len__ + 1)
-    #     for index in sampleData_ele:
-    #         data_vec[index] = sampleData_ele[index]
-    #     data_vec[-1] = sampleData_ele[-1]
-    #     return data_vec
 
     def GeneratorDataCol(self,dic_length):
         logger = logging.getLogger(__name__)
@@ -65,12 +60,12 @@ class Bayes:
         logger = logging.getLogger(__name__)
         logger.info('start create weight matrix....')
         startTime = time.time()
-        totalClassWordsNum = array([0.0] * self.__sample_data__.shape[1])
         docNum = len(self.__labelvec__)
+        rowSum = np.sum(self.__sample_data__, axis=1)
         weightMatrix = []
         weightLable = []
         if tfIDF == False:
-            return weightMatrix/(1 + totalClassWordsNum)
+            return  self.__sample_data__ / rowSum
         else:
             #计算TF
             matrixDic = {}
@@ -86,10 +81,11 @@ class Bayes:
             #计算IDF
             logger.info( 'start caculte IDF....')
             startTime = time.time()
-            idf = np.array([log(docNum / (1.0 + docNum - np.sum(ele == 0))) for ele in self.__sample_data__.T])
+            idf = np.log(docNum / (1.0 + docNum - np.sum(self.__sample_data__ == 0, axis=0)))
+            #idf = np.array([log(docNum / (1.0 + docNum - np.sum(ele == 0))) for ele in self.__sample_data__.T])
             endTime = time.time()
             logger.info( 'IDF caculte end cost {0}s'.format(endTime - startTime))
-            return np.array(weightMatrix) * log(idf),weightLable
+            return np.array(weightMatrix) * log(idf),weightLable, log(idf)
 
     def Pridict(self,testVec):
         classProb =  self.__classprob__
@@ -99,3 +95,6 @@ class Bayes:
         index = np.argwhere(vec == maxVal)
         lable = self.labelVec[index[0][0]]
         return lable
+
+    def PridictWithTF(self, root_path, sampleData):
+        myTf = MyTensorflow(self.dataMatrix, self.labelVec)
